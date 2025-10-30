@@ -5,7 +5,7 @@ Business logic for daily content sync
 """
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
-from sympy import content
+
 from src.core.services.base_service import BaseService
 from src.core.repositories.content_repository import ContentRepository
 from src.core.repositories.preference_repository import PreferenceRepository
@@ -352,7 +352,7 @@ class ContentService(BaseService):
 
             logger.info(f"Requesting {fact_count} facts and {question_count} questions.")
 
-            # Fetch undelivered content
+            # Fetch undelivered content 
             content = self.content_repo.get_undelivered_questions(
                 user_id=user.id,
                 exam_types=exam_types,
