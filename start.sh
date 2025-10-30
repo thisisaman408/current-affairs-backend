@@ -1,42 +1,54 @@
 #!/bin/bash
-# Master startup script - runs ALL workers + FastAPI in one container
+set -e
 
 echo "🚀 Starting Current Affairs Backend..."
 
-# ===== 1. START CELERY WORKER (Scheduled Tasks) =====
+# Set default PORT if not set (for local development)
+PORT=${PORT:-8000}
+
+# Start Celery worker
 echo "👷 Starting Celery worker (scheduled tasks)..."
-celery -A workers.celery_tasks worker --loglevel=info --concurrency=1 &
+celery -A workers.celery_tasks worker --loglevel=info &
 CELERY_PID=$!
 echo "✅ Celery worker started (PID: $CELERY_PID)"
 
-# ===== 2. START CELERY BEAT (Cron Scheduler) =====
+# Start Celery Beat
 echo "⏰ Starting Celery Beat (task scheduler)..."
 celery -A workers.celery_tasks beat --loglevel=info &
 BEAT_PID=$!
 echo "✅ Celery Beat started (PID: $BEAT_PID)"
 
-# ===== 3. START PDF PROCESSOR WORKER =====
+# Start PDF Processor
 echo "📄 Starting PDF Processor worker..."
 python workers/pdf_processor.py &
 PDF_PID=$!
 echo "✅ PDF Processor started (PID: $PDF_PID)"
 
-# ===== 4. START AI GENERATOR WORKER =====
+# Start AI Generator
 echo "🤖 Starting AI Generator worker..."
 python workers/ai_generator.py &
 AI_PID=$!
 echo "✅ AI Generator started (PID: $AI_PID)"
 
-# Give all workers time to initialize
+# Wait for workers to initialize
 echo "⏳ Waiting 5 seconds for workers to initialize..."
 sleep 5
 
-# ===== 5. START FASTAPI SERVER (Foreground) =====
+# Function to cleanup on exit
+cleanup() {
+    echo "⚠️ FastAPI stopped, shutting down workers..."
+    kill $CELERY_PID $BEAT_PID $PDF_PID $AI_PID 2>/dev/null
+    echo "🛑 All processes stopped"
+    exit 0
+}
+
+# Trap SIGINT and SIGTERM
+trap cleanup SIGINT SIGTERM
+
+# Start FastAPI
 echo "🌐 Starting FastAPI server..."
 echo "📡 API will be available at: http://0.0.0.0:$PORT"
 uvicorn src.main:app --host 0.0.0.0 --port $PORT
 
-# If FastAPI crashes, kill all workers
-echo "⚠️ FastAPI stopped, shutting down workers..."
-kill $CELERY_PID $BEAT_PID $PDF_PID $AI_PID 2>/dev/null
-echo "🛑 All processes stopped"
+# Cleanup on normal exit
+cleanup
