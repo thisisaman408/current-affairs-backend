@@ -5,19 +5,31 @@ from src.config import settings
 from celery import Celery
 from celery.schedules import crontab
 from src.database.session import SessionLocal
-from src.models.user import User, SubscriptionStatus
-from src.models.subscription_history import SubscriptionHistory
+
+# Import ALL models from the package (this ensures SQLAlchemy mapper initialization)
+from src.models import (
+    User, 
+    UserPreferences, 
+    SubscriptionHistory, 
+    SubscriptionStatus,
+    DeviceToken,
+    DeliveryLog
+)
+
 from datetime import datetime
 import sys
 import logging
 
+
 logger = logging.getLogger(__name__)
+
 if not settings.REDIS_URL:
     print("❌ ERROR: REDIS_URL environment variable is not set!")
     print("❌ Cannot start Celery worker without Redis!")
     sys.exit(1)
+
 print(f"✅ Using Redis broker: {settings.REDIS_URL[:30]}...")
-celery = Celery('current_affairs', broker=settings.REDIS_URL,backend=settings.REDIS_URL)
+celery = Celery('current_affairs', broker=settings.REDIS_URL, backend=settings.REDIS_URL)
 
 
 @celery.task
@@ -68,5 +80,5 @@ celery.conf.beat_schedule = {
     }
 }
 
-# Set timezone via update to avoid assigning to Settings property directly
+# Set timezone
 celery.conf.update(timezone='Asia/Kolkata')
