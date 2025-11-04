@@ -14,10 +14,16 @@ from src.core.repositories.user_repository import UserRepository
 from src.core.repositories.preference_repository import PreferenceRepository
 from src.core.repositories.device_token_repository import DeviceTokenRepository
 from src.core.services.user_service import UserService
-from src.api.dependencies import get_current_user
+from src.api.dependencies import get_current_user,get_db
 from src.models.user import User
 from typing import cast
+from src.utils.timezone_utils import now_ist
 import logging
+from pydantic import BaseModel
+
+
+class AddNotificationSlotRequest(BaseModel):
+    slot_time: str  # "HH:MM"
 
 logger = logging.getLogger(__name__)
 
@@ -196,4 +202,65 @@ async def get_devices(
             for device in devices
         ],
         "total": len(devices)
+    }
+
+
+@router.post("/preferences/add-notification-slot")
+async def add_notification_slot(
+    request: AddNotificationSlotRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Add single notification slot - detects FUTURE slots automatically"""
+    
+    slot_time = request.slot_time
+    
+    try:
+        hour, minute = map(int, slot_time.split(':'))
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValueError
+    except:
+        raise HTTPException(status_code=400, detail="Invalid time format HH:MM")
+    
+    pref_repo = PreferenceRepository(db)
+    prefs = pref_repo.get_by_user_id(current_user.id)
+    
+    if not prefs:
+        raise HTTPException(status_code=404, detail="Preferences not found")
+    
+    existing_slots = set(prefs.notification_times or [])
+    
+    if slot_time in existing_slots:
+        return {
+            "success": False,
+            "message": f"Slot {slot_time} already exists",
+            "preferences": {
+                "notification_times": sorted(list(existing_slots)),
+                "daily_item_count": prefs.daily_item_count,
+                "exam_types": prefs.exam_types,
+            }
+        }
+    
+    # ✅ Check if FUTURE slot TODAY
+    now = now_ist()
+    slot_datetime = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    is_future_slot = slot_datetime > now
+    
+    existing_slots.add(slot_time)
+    sorted_slots = sorted(list(existing_slots))
+    
+    prefs = pref_repo.update_notification_times(current_user.id, sorted_slots)
+    
+    logger.info(f"✅ Slot {slot_time} added (future: {is_future_slot}) for user {current_user.id}")
+    
+    return {
+        "success": True,
+        "message": f"Slot {slot_time} added",
+        "is_future_slot": is_future_slot,
+        "preferences": {
+            "notification_times": sorted_slots,
+            "daily_item_count": prefs.daily_item_count,
+            "exam_types": prefs.exam_types,
+        },
+        "next_action": "call_sync" if is_future_slot else None
     }

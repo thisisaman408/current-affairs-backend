@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime
 # Add import for explicit casting if needed, though usually not required for native enums
@@ -7,16 +7,17 @@ from datetime import datetime
 from src.models.delivery_log import DeliveryLog, NotificationStatus
 from src.utils.timezone_utils import now_ist
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 class DeliveryLogRepository:
-    def mark_as_delivered(self, user_id: int, question_ids: List[int], db: Session, platform="mobile", delivery_status: NotificationStatus = NotificationStatus.SENT) -> bool:
+    def mark_as_delivered(self, user_id: int, question_ids: List[int], db: Session, platform="mobile", delivery_status: NotificationStatus = NotificationStatus.SENT,delivered_at: Optional[datetime] = None) -> bool:
         """
         Mark items as delivered for a user, respecting atomic upserts (no repeats).
         """
         try:
-            now = now_ist()
+            delivery_timestamp = delivered_at if delivered_at else now_ist()
             new_logs = []
             # --- DEBUG LOGGING START ---
             logger.info(f"Attempting to mark {len(question_ids)} items for user {user_id}. Status enum provided: {delivery_status}, Enum value: {delivery_status.value}")
@@ -42,7 +43,7 @@ class DeliveryLogRepository:
                     log = DeliveryLog(
                         user_id=user_id,
                         question_id=qid,
-                        delivered_at=now,
+                        delivered_at=delivery_timestamp,
                         platform=platform,
                         # Ensure using the lowercase string value
                         delivery_status=status_value_to_insert,

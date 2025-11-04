@@ -18,6 +18,7 @@ from src.schemas.content_schemas import (
 from src.core.repositories.content_repository import ContentRepository
 from src.core.services.content_service import ContentService
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -259,12 +260,21 @@ async def mark_delivered(
 ):
     try:
         logger.info(f"✅ Marking {len(request.question_ids)} items as delivered for user {current_user.id}")
+        delivered_at = None
+        if request.delivered_at:
+            try:
+                delivered_at = datetime.fromisoformat(request.delivered_at.replace('Z', '+00:00'))
+                logger.info(f"   Using custom timestamp: {delivered_at}")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to parse delivered_at: {request.delivered_at}, using current time. Error: {e}")
+        
         content_repo = ContentRepository()
         # This now delegates fully to DeliveryLogRepository inside ContentRepository
         success = content_repo.mark_as_delivered(
             user_id=current_user.id,
             question_ids=request.question_ids,
-            db=db
+            db=db,
+            delivered_at=delivered_at 
         )
         if not success:
             raise HTTPException(status_code=500, detail="Failed to mark content as delivered")
@@ -316,7 +326,7 @@ async def get_scheduled_content(
             exam_types=prefs.exam_types or ['UPSC'],
             db=db
         )
-        
+        print("The data return from backend is : ", result)
         if not result['success']:
             logger.warning(f"⚠️ No scheduled content for user {current_user.id}")
             return []

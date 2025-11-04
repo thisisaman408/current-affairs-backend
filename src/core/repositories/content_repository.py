@@ -38,7 +38,7 @@ class ContentRepository:
             delivered_ids = db.query(DeliveryLog.question_id).filter(
                 DeliveryLog.user_id == user_id
             ).distinct()
-
+            logger.info(f"The fact count here is : {fact_count} and question count is : {question_count}")
             # Fetch facts: newest first, not delivered, for allowed exams
             facts_query = (
                 db.query(Question)
@@ -74,7 +74,7 @@ class ContentRepository:
             logger.error(f"❌ Failed in get_undelivered_questions: {e}")
             return []
 
-    def mark_as_delivered(self, user_id: int, question_ids: List[int], db: Session) -> bool:
+    def mark_as_delivered(self, user_id: int, question_ids: List[int], db: Session,delivered_at: Optional[datetime] = None) -> bool:
         """
         Uses DeliveryLogRepository for robust delivery marking (atomic, NO repeats).
         """
@@ -85,7 +85,8 @@ class ContentRepository:
                 question_ids=question_ids,
                 db=db,
                 platform='mobile',
-                delivery_status=NotificationStatus.SENT
+                delivery_status=NotificationStatus.SENT,
+                delivered_at=delivered_at 
             )
         except Exception as e:
             logger.error(f"Failed to mark as delivered for user {user_id}: {e}")

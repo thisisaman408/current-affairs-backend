@@ -185,6 +185,7 @@ class ContentService(BaseService):
                 "category": q.category,
                 # Use the assigned scheduled_time attribute
                 "scheduled_time": getattr(q, 'scheduled_time', None),
+                "delivered_at": None,
             }
             if q.content_type == 'question' and q.options:
                 item_data["options"] = q.options
@@ -361,7 +362,7 @@ class ContentService(BaseService):
                 question_count=question_count,
                 db=db,
             )
-
+            if(len(content) == 0): logger.info(f"The content is 0 {content}")
             actual_fetched_count = len(content)
             if actual_fetched_count < total_items_to_fetch:
                 logger.warning(f"Fetch Shortfall for user {user.id}: Wanted {total_items_to_fetch}, Got {actual_fetched_count}.")

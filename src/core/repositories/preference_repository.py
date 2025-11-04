@@ -102,3 +102,19 @@ class PreferenceRepository(BaseRepository[UserPreferences]):
                 return False, f"Time must be in HH:MM format: {time_str}"
         
         return True, None
+
+
+    def update_notification_times(self, user_id: int, notification_times: List[str]) -> Optional[UserPreferences]:
+        """Update ONLY notification_times field"""
+        prefs = self.db.query(UserPreferences).filter(
+            UserPreferences.user_id == user_id
+        ).first()
+        
+        if not prefs:
+            return None
+        
+        prefs.notification_times = notification_times
+        self.db.commit()
+        self.db.refresh(prefs)
+        
+        return prefs

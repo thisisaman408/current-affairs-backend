@@ -18,7 +18,7 @@ class ContentItem(BaseModel):
     date_from: Optional[str] = None
     date_to: Optional[str] = None
     scheduled_time: Optional[str] = None  # IST timestamp for this item
-    delivered_at: Optional[str]
+    delivered_at: Optional[datetime] = None
 
 
 class FetchDailyRequest(BaseModel):
@@ -50,6 +50,10 @@ class DailySyncResponse(BaseModel):
 class MarkDeliveredRequest(BaseModel):
     """Mark content as delivered"""
     question_ids: List[int]
+    delivered_at: Optional[str] = Field(
+        None, 
+        description="ISO string in IST timezone (e.g. 2025-11-02T15:30:00+05:30). If null, uses current IST time."
+    )
 
 
 class MarkDeliveredResponse(BaseModel):
